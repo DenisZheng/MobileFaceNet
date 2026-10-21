@@ -1,13 +1,15 @@
-# MobileFaceNets（修复版 / fixed）
+# MobileFaceNets (fixed)
 
-> 本仓库基于 [foamliu/MobileFaceNet](https://github.com/foamliu/MobileFaceNet)（Apache-2.0）master `a6cc903` 修复而来。上游 master 在 2020 年后被多个第三方 PR 改动，核心训练链已无法直接运行（配置来源不一致、类别数被污染、checkpoint 格式与现代 PyTorch 不兼容等）。本版在**不改变 128 维 MobileFaceNet 模型结构**的前提下修复了 21 项工程问题，使其在 PyTorch 2.x 上可训练、可评估、可导出 ONNX（面向 ESP-PPQ / ESP-DL 量化部署）。
+**English** | [简体中文](README.zh-CN.md)
+
+> This repository is a repaired fork of [foamliu/MobileFaceNet](https://github.com/foamliu/MobileFaceNet) (Apache-2.0), based on upstream master `a6cc903`. After 2020, upstream master absorbed several third-party PRs and its training pipeline no longer runs as-is (inconsistent configuration sources, polluted class counts, a checkpoint format incompatible with modern PyTorch, and more). This fork fixes 21 engineering issues **without changing the 128-d MobileFaceNet model architecture**, so that it trains, evaluates, and exports ONNX on PyTorch 2.x, targeting ESP-PPQ / ESP-DL quantization.
 >
-> - 逐项修复说明：[PATCH_NOTES.md](PATCH_NOTES.md)
-> - 完整训练流程（MS1M-ArcFace + LFW，RTX 4080）：[MobileFaceNet-foamliu修复版-训练流程.md](MobileFaceNet-foamliu修复版-训练流程.md)（venv / Docker 环境）
-> - Conda 版训练流程（独立文档，环境层为 Conda，配套 `environment.yml`）：[MobileFaceNet-foamliu修复版-训练流程-Conda.md](MobileFaceNet-foamliu修复版-训练流程-Conda.md)
-> - 环境自检：`python smoke_test.py`
-> - 说明：`weights/` 与 `pretrained_model/` 中的第三方权重文件未随本仓库分发（来源不明或体积过大）；LFW 对齐所需的 RetinaFace 权重在 `retinaface/weights/` 内。数据集（MS1M-ArcFace、LFW）请按训练流程文档中的链接自行下载，本仓库不分发数据集。
-> - 原始实现与引用请见上游仓库及下方论文链接。
+> - Fix-by-fix notes: [PATCH_NOTES.md](PATCH_NOTES.md)
+> - Full training guide (MS1M-ArcFace + LFW, RTX 4080; venv / Docker environment): [MobileFaceNet-foamliu修复版-训练流程.md](MobileFaceNet-foamliu修复版-训练流程.md)
+> - Conda edition of the training guide (standalone document, Conda environment layer, with `environment.yml`): [MobileFaceNet-foamliu修复版-训练流程-Conda.md](MobileFaceNet-foamliu修复版-训练流程-Conda.md)
+> - Environment self-check: `python smoke_test.py`
+> - Note: third-party weight files under `weights/` and `pretrained_model/` are not distributed with this fork (unknown provenance or oversized). The RetinaFace weights needed for LFW alignment are in `retinaface/weights/`. Datasets (MS1M-ArcFace, LFW) are not distributed either; download them via the links in the training guides.
+> - For the original implementation and citation, see the upstream repository and the paper link below.
 
 # MobileFaceNets
 
@@ -26,12 +28,16 @@ PyTorch implementation of MobileFaceNets: Efficient CNNs for Accurate Real-Time 
 ## Dataset
 ### Introduction
 
-Refined MS-Celeb-1M dataset for training, 3,804,846 faces over 85,164 identities. 
+Refined MS-Celeb-1M dataset for training, 3,804,846 faces over 85,164 identities.
 LFW and Megaface datasets for testing.
 
+*Note: this fixed version's training guides use MS1M-ArcFace (faces_emore) instead: 5,822,653 faces over 85,742 identities.*
+
 ## Dependencies
-- Python 3.6.8
-- PyTorch 1.3.0
+- Python 3.10+
+- PyTorch 2.x
+
+See `requirements.txt` (venv / Docker route) or `environment.yml` (Conda route).
 
 ## Usage
 
@@ -47,10 +53,7 @@ $ python pre_process.py
 $ python train.py
 ```
 
-To visualize the training process：
+To visualize the training process:
 ```bash
 $ tensorboard --logdir=runs
 ```
-
-
-
