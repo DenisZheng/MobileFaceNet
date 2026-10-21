@@ -1,0 +1,30 @@
+# Conda environment for the fixed MobileFaceNet (Conda training route).
+# Usage:  conda env create -f environment.yml && conda activate mfn
+# This file replaces requirements.txt on the Conda route -- do NOT also run
+# `pip install -r requirements.txt` inside this env (its opencv-python would
+# override the conda-forge opencv and reintroduce the libGL.so.1 problem).
+name: mfn
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  # conda-forge builds ship their own GUI/system libs (no libGL.so.1 issue)
+  - opencv
+  - numpy
+  - scipy
+  - matplotlib
+  - tqdm
+  - scikit-image
+  - pillow
+  - pip:
+      # Linux wheels from PyPI are CUDA-enabled builds; verify with
+      # torch.cuda.is_available() after creation (see the Conda guide, sec. 3).
+      - torch
+      - torchvision
+      - tensorboard
+      # Only needed by image_aug.py (optional data augmentation helper)
+      - imgaug
+# NOTE: mxnet is intentionally NOT included. It has no wheels for recent
+# Python versions; pre_process.py falls back to a built-in RecordIO reader.

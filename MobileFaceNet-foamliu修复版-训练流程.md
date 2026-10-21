@@ -3,7 +3,7 @@
 本流程与附件《MobileFaceNet-ArcFace 构建、验证与训练流程》的区别先说清：
 
 ```text
-代码基线：foamliu/MobileFaceNet master a6cc903 + 本仓库修复版（见 PATCH_NOTES.md，共 14 项修复）
+代码基线：foamliu/MobileFaceNet master a6cc903 + 本仓库修复版（见 PATCH_NOTES.md，共 21 项修复）
 不用：InsightFace arcface_torch / train_v2.py / MS1M-RetinaFace(MS1MV3) / 512 维 mbf
 训练集：MS1M-ArcFace（faces_emore），85,742 人 / 5,822,653 张
 测试集：LFW funneled 版（6,000 对）
@@ -678,10 +678,10 @@ delivery/
 ```text
 上游代码：foamliu/MobileFaceNet master
   a6cc9032a659b615f477833e1a70b5e7931bcccc（2025-12-17）
-修复版：本仓库 PATCH_NOTES.md（14 项，含 LFW 对齐缓存与测试对生成器两项补充）
+修复版：本仓库 PATCH_NOTES.md（21 项 = 原 14 项 + 评审追加 #15–#21）
 数据集页面：InsightFace recognition/_datasets_（MS1M-ArcFace / LFW 条目）
 LFW 官方站：http://vis-www.cs.umass.edu/lfw/
 作者公布参照值：LFW 99.48%、MegaFace 82.55%（本流程不做 MegaFace）
 ```
 
-上游 master 若再变化，不要直接覆盖本修复版；先逐项核对 PATCH_NOTES 的 14 项问题在新版里是否还存在，再决定迁移。
+上游 master 若再变化，不要直接覆盖本修复版；先逐项核对 PATCH_NOTES 的 21 项问题在新版里是否还存在，再决定迁移。
