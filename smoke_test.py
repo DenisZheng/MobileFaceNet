@@ -13,12 +13,19 @@ Checks:
   6. data_gen transforms output shape and value range for NORM_PRESET.
 """
 import os
+import shutil
 import sys
+import tempfile
 
 import torch
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
+# save_checkpoint() writes checkpoint.tar / BEST_checkpoint.tar to the CURRENT
+# directory. Run everything below in a throwaway directory so this self-check
+# can never overwrite (and then delete) a real training checkpoint, e.g. when
+# it is re-run from the repo root in the middle of or after a training run.
+_WORKDIR = tempfile.mkdtemp(prefix='mfn_smoke_')
+os.chdir(_WORKDIR)
 
 import config
 from mobilefacenet import MobileFaceNet, ArcMarginModel
@@ -82,7 +89,6 @@ t = data_transforms['val'](img)
 print('6. val transform OK: shape={}, range=[{:.3f}, {:.3f}]'.format(tuple(t.shape), t.min().item(), t.max().item()))
 assert t.shape == (3, 112, 112)
 
-for f in ('checkpoint.tar', 'BEST_checkpoint.tar', out, out + '.data'):
-    if os.path.exists(f):
-        os.remove(f)
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+shutil.rmtree(_WORKDIR, ignore_errors=True)
 print('SMOKE TEST PASSED')

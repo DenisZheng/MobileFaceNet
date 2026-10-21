@@ -14,7 +14,7 @@
 | 4 | `facenet_utils.py` | 顶层 `from retinaface.detector import detector`，导入瞬间就在 CUDA 上实例化检测器——连 train.py 都 import 不了 | 改懒加载 `get_detector()`，首次做人脸对齐时才建，自动选 cuda/cpu |
 | 5 | `facenet_utils.py` `save_checkpoint` | 存的是整个模型对象（pickle），PyTorch ≥2.6 默认 `weights_only=True` 直接拒绝加载；还把 DataParallel 和作者的类路径焊死在文件里 | 改存 state_dict（model/metric_fc/optimizer）。新增 `load_checkpoint_file` / `load_model_from_checkpoint`：新格式直接读，旧格式（原版 BEST_checkpoint.tar）自动降级兼容 |
 | 6 | `facenet_utils.py` `parse_args` | 默认值被子集实验污染：lr 0.0001（ArcFace 不收敛）、batch 256、end-epoch 30；且 `type=bool` 使 `--focal-loss False` 反而开启 | 恢复 lr 0.1 / batch 512；end-epoch 设 50 与里程碑配套（原版 1000 实为"手动停"）；bool 参数改 `str2bool` 显式解析 |
-| 7 | `train.py` | resume 靠 unpickle 整模型；单卡也无条件套 DataParallel；调度里程碑被改成 [5,10,15,20] | 统一先建模型再 load state_dict resume（旧格式 checkpoint 请先用 export.py 转一次）；仅多卡时套 DataParallel；里程碑恢复 [10,20,30,40]，`scheduler.step()` 现代写法。注意：resume 后调度器计数重置，LR 曲线不是位级续接 |
+| 7 | `train.py` | resume 靠 unpickle 整模型；单卡也无条件套 DataParallel；调度里程碑被改成 [5,10,15,20] | 统一先建模型再 load state_dict resume（旧格式 checkpoint 请先用 export.py 转一次）；仅多卡时套 DataParallel；里程碑恢复 [10,20,30,40]，`scheduler.step()` 现代写法。续训时的设备顺序与调度器计数见下方 #16 / #17 |
 | 8 | `megaface.py` | `from utils import ...`，而 utils 已被 vendored 的 YOLOv5 包占用（空 `__init__`），ImportError | 改从 `facenet_utils` 导入，并用统一的 checkpoint loader |
 | 9 | `lfw_eval.py` / `export.py` | `__main__` 里 `checkpoint['model'].module` 的旧式加载，现代 torch 加载即崩 | 统一走 `load_model_from_checkpoint`（新旧格式都吃） |
 | 10 | `pre_process.py` | 循环写死 `range(200000)`（同 #2 的子集污染）；强依赖已停止维护的 mxnet（新 Python 装不上） | 改用 `config.num_samples` 全量；新增内置 RecordIO 读取器作 fallback（mxnet 在时仍优先用 mxnet），解码后会校验类别数并警告与 config 不符 |
@@ -57,3 +57,16 @@ python export.py         # BEST_checkpoint.tar -> mobilefacenet.pt + scripted
 python export_onnx.py    # -> mobilefacenet.onnx（给 ESP-PPQ 用）
 python smoke_test.py     # 随时可跑的环境自检
 ```
+
+## 评审后追加的修正（针对第一版修复）
+
+| # | 文件 | 问题 | 修正 |
+|---|------|------|------|
+| 15 | `smoke_test.py` | `save_checkpoint` 写到当前目录：在仓库根目录运行会**覆盖并随后删除**真实的 `checkpoint.tar` / `BEST_checkpoint.tar` | 改在临时目录里运行，结束后清理 |
+| 16 | `train.py` | 续训：`optimizer.load_state_dict` 发生在 `model.to(device)` 之前，动量缓冲留在 CPU，GPU 上第一次 `optimizer.step()` 会设备不一致（按 PyTorch 语义推断，未在 GPU 上实测） | 先 `.to(device)` 再建优化器、再加载状态 |
+| 17 | `train.py` | 续训时 `MultiStepLR` 计数从 0 重来，里程碑整体后移 `start_epoch` 个 epoch（并非"位级不衔接"这么轻） | `MultiStepLR(..., last_epoch=start_epoch-1)` |
+| 18 | `facenet_utils.py` | `load_checkpoint_file` 任何异常都静默回退到 `weights_only=False`（可执行任意代码，且会掩盖文件不存在等错误） | 只在 weights-only 解包失败时回退，并发出明确警告 |
+| 19 | `pre_process.py` | 内置 RecordIO 读取器比 mxnet 路径少读最后一张图（`n >= num_samples`） | 改为 `n > num_samples` |
+| 20 | `export_onnx.py` | 文档字符串称 opset 11/13 "最稳"，Espressif 文档并未钉死 opset | 改为中性表述，由 `--opset` 决定 |
+| 21 | `test_resume_semantics.py`（新增） | 续训语义无自动检查 | 新增玩具模型测试，含"旧行为必须发散"的对照 |
+

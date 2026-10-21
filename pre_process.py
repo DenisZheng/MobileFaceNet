@@ -79,7 +79,9 @@ def _iter_records_fallback():
         for n, key in enumerate(keys):
             if n == 0:
                 continue  # record 0 holds dataset meta, not an image
-            if n >= num_samples:
+            # n == record key for image records (key 0 is the meta record), so
+            # images are keys 1..num_samples -- same range as the mxnet path.
+            if n > num_samples:
                 break
             start = positions[key]
             end = positions[keys[n + 1]] if n + 1 < len(keys) else file_size

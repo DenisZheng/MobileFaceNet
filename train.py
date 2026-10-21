@@ -29,6 +29,15 @@ def train_net(args):
     model = MobileFaceNet()
     metric_fc = ArcMarginModel(args)
 
+    # Move to the target device BEFORE building the optimizer and BEFORE
+    # loading its state. Optimizer.load_state_dict() casts the saved state
+    # (momentum buffers) to the device the parameters are on *at load time*;
+    # if the model were moved to the GPU afterwards, the buffers would stay on
+    # the CPU and the first optimizer.step() after a resume would fail with a
+    # device mismatch.
+    model = model.to(device)
+    metric_fc = metric_fc.to(device)
+
     optimizer = torch.optim.SGD([{'params': model.conv1.parameters()},
                                  {'params': model.dw_conv.parameters()},
                                  {'params': model.features.parameters()},
@@ -62,10 +71,6 @@ def train_net(args):
 
     logger = get_logger()
 
-    # Move to GPU, if available
-    model = model.to(device)
-    metric_fc = metric_fc.to(device)
-
     # Loss function
     if args.focal_loss:
         criterion = FocalLoss(gamma=args.gamma).to(device)
@@ -78,10 +83,18 @@ def train_net(args):
 
     # Author's milestones; upstream master had [5, 10, 15, 20] from the
     # same small-subset run that produced the lr=1e-4 default.
-    # NOTE on resume: the scheduler restarts its count, so a resumed run
-    # re-arms these milestones -- acceptable for this codebase's scale,
-    # but don't expect bit-exact continuation of the LR schedule.
-    scheduler = MultiStepLR(optimizer, milestones=[10, 20, 30, 40], gamma=0.1)
+    # Resume: the checkpoint is written BEFORE scheduler.step(), so the saved
+    # optimizer lr is the one used in epoch `start_epoch - 1`. Telling the
+    # scheduler `last_epoch=start_epoch - 1` makes its first (initial) step land
+    # on `start_epoch`, applying a milestone decay if one falls exactly there,
+    # and keeps every later milestone at its ORIGINAL epoch number. Without
+    # this the step counter restarts at 0 and the whole decay schedule shifts
+    # by `start_epoch` epochs. On a fresh run start_epoch == 0 -> last_epoch -1
+    # (the PyTorch default), i.e. no behaviour change. The optimizer's
+    # 'initial_lr' (required by PyTorch when last_epoch != -1) comes back with
+    # optimizer.load_state_dict() because it is stored in param_groups.
+    scheduler = MultiStepLR(optimizer, milestones=[10, 20, 30, 40], gamma=0.1,
+                            last_epoch=start_epoch - 1)
 
     # Epochs
     for epoch in range(start_epoch, args.end_epoch):

@@ -6,9 +6,12 @@ Usage:
     python export_onnx.py --weights mobilefacenet.pt --opset 13
 
 Input is fixed at [1, 3, 112, 112]; output is the [1, 128] embedding
-(the backbone's final BatchNorm2d output flattened). Keep the opset at
-11 (default) or 13: ESP-PPQ's ONNX parser is happiest there, and this
-graph only needs Conv / BatchNorm / Relu / Relu6(Clip) / Add / Reshape.
+(the backbone's final BatchNorm2d output flattened). The opset is a free
+choice: Espressif's quantization docs do not pin one, so use whichever value
+your ESP-PPQ run accepts (pass --opset). In eval mode the exporter folds every
+BatchNorm into the preceding Conv, so the graph only needs Conv / Relu /
+Relu6(Clip) / Add / Reshape. ESP-DL quantization requires batch size 1, which
+is why the input shape is fixed.
 Remember the model expects the normalization chosen in config.py
 (NORM_PRESET) -- your ESP-PPQ calibration dataloader must apply the
 same preprocessing.

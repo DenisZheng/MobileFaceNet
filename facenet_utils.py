@@ -1,5 +1,7 @@
 import argparse
 import logging
+import pickle
+import warnings
 
 import cv2 as cv
 import numpy as np
@@ -63,7 +65,14 @@ def load_checkpoint_file(path):
     """
     try:
         return torch.load(path, map_location='cpu', weights_only=True)
-    except Exception:
+    except (pickle.UnpicklingError, RuntimeError) as err:
+        # Only a failed weights-only unpickle (legacy whole-object file) falls
+        # through; a missing file or other I/O error must surface as such.
+        # Full unpickling can execute arbitrary code, so make it loud.
+        warnings.warn('{} is not a weights-only checkpoint ({}); falling back to '
+                      'full unpickling (weights_only=False). Do this only for files '
+                      'you created yourself or fully trust.'.format(
+                          path, str(err).strip().splitlines()[0] if str(err).strip() else type(err).__name__))
         return torch.load(path, map_location='cpu', weights_only=False)
 
 

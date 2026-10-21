@@ -458,8 +458,12 @@ python train.py --checkpoint checkpoint.tar
 ```text
 checkpoint.tar / BEST_checkpoint.tar 均为 state_dict 格式，含 backbone、
 ArcFace 头和 optimizer 状态；续训从 epoch+1 继续。
-LR 调度器计数在续训时会重置，里程碑会重新走一遍——续训不是位级无缝衔接，
-短时中断恢复没问题，频繁中断会让 LR 曲线偏离原计划。
+续训时调度器以 last_epoch=start_epoch-1 重建，LR 里程碑仍落在原来的 epoch
+（10/20/30/40），中断多少次都不会让 LR 曲线整体后移。
+续训前可在目标机器上跑一次 python test_resume_semantics.py 确认这一点。
+注意：每次续训会重新播种随机数、重建 DataLoader 的 shuffle，所以数据顺序不是
+位级续接，但 LR 与优化器状态是连续的。
+训练期间不要在仓库根目录运行任何会写 checkpoint.tar 的自检脚本。
 旧格式（整对象 pickle）的上游 checkpoint 不能直接续训，先用 export.py 转出权重。
 ```
 
