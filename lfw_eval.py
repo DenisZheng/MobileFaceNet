@@ -317,11 +317,15 @@ def lfw_test(model):
         print('Extracting {}...'.format(filename))
         extract(filename)
 
-    # if not os.path.isfile(lfw_pickle):
-    print('Processing {}...'.format(lfw_pickle))
-    process()
+    # Detection/alignment of all 13,233 LFW images only needs to happen
+    # once; upstream had this guard commented out, so every epoch of
+    # training re-ran RetinaFace over the whole LFW set.
+    if not os.path.isfile(lfw_pickle):
+        print('Processing {}...'.format(lfw_pickle))
+        process()
+    else:
+        print('Using cached {}'.format(lfw_pickle))
 
-    # if not os.path.isfile(angles_file):
     print('Evaluating {}...'.format(angles_file))
     evaluate(model)
 
@@ -335,11 +339,8 @@ def lfw_test(model):
 
 
 if __name__ == "__main__":
-    checkpoint = 'BEST_checkpoint.tar'
-    checkpoint = torch.load(checkpoint)
-    model = checkpoint['model'].module
-    model = model.to(device)
-    model.eval()
+    from facenet_utils import load_model_from_checkpoint
+    model = load_model_from_checkpoint('BEST_checkpoint.tar', device)
 
     # scripted_model_file = 'pretrained_model/mobilefacenet_scripted.pt'
     # model = torch.jit.load(scripted_model_file)

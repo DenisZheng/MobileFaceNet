@@ -12,13 +12,13 @@ from tqdm import tqdm
 
 from config import device
 from data_gen import data_transforms
-from utils import align_face, get_central_face_attributes
+# Upstream imported these from `utils`, but that name is now the vendored
+# YOLOv5 package (empty __init__) -- the functions live in facenet_utils.
+from facenet_utils import align_face, get_central_face_attributes, load_model_from_checkpoint
 
 checkpoint = 'BEST_checkpoint.tar'
 print('loading model: {}...'.format(checkpoint))
-checkpoint = torch.load(checkpoint)
-model = checkpoint['model'].to(device)
-model.eval()
+model = load_model_from_checkpoint(checkpoint, device)
 transformer = data_transforms['val']
 
 

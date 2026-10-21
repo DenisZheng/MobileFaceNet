@@ -5,20 +5,22 @@ from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
 
-from config import IMG_DIR, pickle_file
+from config import IMG_DIR, pickle_file, NORM_MEAN, NORM_STD
 
 # Data augmentation and normalization for training
 # Just normalization for validation
+# Normalization constants come from config.py (NORM_PRESET) so training,
+# LFW evaluation and deployment preprocessing can never drift apart.
 data_transforms = {
     'train': transforms.Compose([
         transforms.RandomHorizontalFlip(),
         transforms.ColorJitter(brightness=0.125, contrast=0.125, saturation=0.125),
         transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+        transforms.Normalize(NORM_MEAN, NORM_STD),
     ]),
     'val': transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        transforms.Normalize(NORM_MEAN, NORM_STD)
     ]),
 }
 
