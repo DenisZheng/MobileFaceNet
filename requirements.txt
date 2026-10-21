@@ -1,11 +1,18 @@
-matplotlib
-scipy
-tqdm
-opencv-python
-pillow
+# Core training / evaluation path (Python 3.10+, PyTorch 2.x)
 torch
 torchvision
+tensorboard
+opencv-python
+pillow
 numpy
+scipy
+matplotlib
+tqdm
 scikit-image
-torchsummary
+# Only needed by image_aug.py (optional data augmentation helper)
 imgaug
+# NOTE: mxnet is intentionally NOT listed. It has no wheels for recent
+# Python versions; pre_process.py falls back to a built-in RecordIO
+# reader when mxnet is not installed.
+# NOTE: torchsummary was listed upstream but nothing in the core path
+# imports it; dropped.

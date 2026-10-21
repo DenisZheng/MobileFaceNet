@@ -9,7 +9,7 @@ from data_gen import ArcFaceDataset
 from focal_loss import FocalLoss
 from lfw_eval import lfw_test
 from mobilefacenet import MobileFaceNet, ArcMarginModel
-from facenet_utils import parse_args, save_checkpoint, AverageMeter, accuracy, get_logger, clip_gradient
+from facenet_utils import parse_args, save_checkpoint, load_checkpoint_file, AverageMeter, accuracy, get_logger, clip_gradient
 
 
 def train_net(args):
@@ -21,31 +21,44 @@ def train_net(args):
     writer = SummaryWriter()
     epochs_since_improvement = 0
 
-    # Initialize / load checkpoint
-    if checkpoint is None:
-        model = MobileFaceNet()
-        metric_fc = ArcMarginModel(args)
+    # Initialize model / metric head / optimizer (always built the same
+    # way; a resume then loads state_dicts into them). Upstream instead
+    # unpickled whole module objects out of the checkpoint, which modern
+    # PyTorch refuses to load (weights_only) and which baked in the
+    # original author's class paths and DataParallel wrapper.
+    model = MobileFaceNet()
+    metric_fc = ArcMarginModel(args)
 
-        optimizer = torch.optim.SGD([{'params': model.conv1.parameters()},
-                                     {'params': model.dw_conv.parameters()},
-                                     {'params': model.features.parameters()},
-                                     {'params': model.conv2.parameters()},
-                                     {'params': model.gdconv.parameters()},
-                                     {'params': model.conv3.parameters(), 'weight_decay': 4e-4},
-                                     {'params': model.bn.parameters()},
-                                     {'params': metric_fc.parameters()}],
-                                    lr=args.lr, momentum=args.mom, weight_decay=args.weight_decay, nesterov=True)
+    optimizer = torch.optim.SGD([{'params': model.conv1.parameters()},
+                                 {'params': model.dw_conv.parameters()},
+                                 {'params': model.features.parameters()},
+                                 {'params': model.conv2.parameters()},
+                                 {'params': model.gdconv.parameters()},
+                                 {'params': model.conv3.parameters(), 'weight_decay': 4e-4},
+                                 {'params': model.bn.parameters()},
+                                 {'params': metric_fc.parameters()}],
+                                lr=args.lr, momentum=args.mom, weight_decay=args.weight_decay, nesterov=True)
 
+    if checkpoint is not None:
+        ckpt = load_checkpoint_file(checkpoint)
+        if 'model_state' in ckpt:
+            start_epoch = ckpt['epoch'] + 1
+            epochs_since_improvement = ckpt['epochs_since_improvement']
+            best_acc = ckpt.get('acc', best_acc)
+            model.load_state_dict(ckpt['model_state'])
+            metric_fc.load_state_dict(ckpt['metric_fc_state'])
+            optimizer.load_state_dict(ckpt['optimizer_state'])
+        else:
+            raise ValueError(
+                '{} is a legacy whole-object checkpoint; convert it first '
+                'with export.py (it understands the legacy format), then '
+                'resume from a state_dict checkpoint.'.format(checkpoint))
+
+    # Only wrap for genuine multi-GPU; DataParallel on a single GPU/CPU
+    # just adds overhead and 'module.' prefixes to every state_dict key.
+    if torch.cuda.device_count() > 1:
         model = nn.DataParallel(model)
         metric_fc = nn.DataParallel(metric_fc)
-
-    else:
-        checkpoint = torch.load(checkpoint)
-        start_epoch = checkpoint['epoch'] + 1
-        epochs_since_improvement = checkpoint['epochs_since_improvement']
-        model = checkpoint['model']
-        metric_fc = checkpoint['metric_fc']
-        optimizer = checkpoint['optimizer']
 
     logger = get_logger()
 
@@ -63,7 +76,12 @@ def train_net(args):
     train_dataset = ArcFaceDataset('train')
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=4)
 
-    scheduler = MultiStepLR(optimizer, milestones=[5, 10, 15, 20], gamma=0.1)
+    # Author's milestones; upstream master had [5, 10, 15, 20] from the
+    # same small-subset run that produced the lr=1e-4 default.
+    # NOTE on resume: the scheduler restarts its count, so a resumed run
+    # re-arms these milestones -- acceptable for this codebase's scale,
+    # but don't expect bit-exact continuation of the LR schedule.
+    scheduler = MultiStepLR(optimizer, milestones=[10, 20, 30, 40], gamma=0.1)
 
     # Epochs
     for epoch in range(start_epoch, args.end_epoch):
@@ -99,7 +117,7 @@ def train_net(args):
 
         # Save checkpoint
         save_checkpoint(epoch, epochs_since_improvement, model, metric_fc, optimizer, best_acc, is_best)
-        scheduler.step(epoch)
+        scheduler.step()
 
 
 def train(train_loader, model, metric_fc, criterion, optimizer, epoch, logger):
@@ -116,8 +134,8 @@ def train(train_loader, model, metric_fc, criterion, optimizer, epoch, logger):
         label = label.to(device)  # [N, 1]
 
         # Forward prop.
-        feature = model(img)  # embedding => [N, 512]
-        output = metric_fc(feature, label)  # class_id_out => [N, 10575]
+        feature = model(img)  # embedding => [N, 128]
+        output = metric_fc(feature, label)  # class_id_out => [N, num_classes]
 
         # Calculate loss
         loss = criterion(output, label)
